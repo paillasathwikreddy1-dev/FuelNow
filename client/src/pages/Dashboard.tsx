@@ -76,13 +76,8 @@ export default function Dashboard() {
 
     // Load any active requests for current user
     if (user?.id) {
-      fuelDataService.getCustomerRequests(user.id).then((reqs) => {
-        const inProgress = reqs.find((r) =>
-          ["pending", "searching", "assigned", "accepted", "on_the_way", "arrived"].includes(
-            r.status
-          )
-        );
-        if (inProgress) setActiveRequest(inProgress);
+      fuelDataService.getActiveRequest(user.id).then((req) => {
+        if (req) setActiveRequest(req);
       });
     }
   }, [user?.id]);
@@ -386,6 +381,14 @@ export default function Dashboard() {
               </div>
 
               <div className="flex items-center gap-3">
+                <Button
+                  size="sm"
+                  onClick={() => setLocation("/tracking")}
+                  className="text-xs bg-amber-600 hover:bg-amber-500 text-white font-bold flex items-center gap-1.5 shadow-lg shadow-amber-950/50"
+                >
+                  <Radio size={13} className="animate-pulse" />
+                  <span>Track on Live Map →</span>
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"

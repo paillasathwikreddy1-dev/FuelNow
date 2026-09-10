@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 import DashboardLayout from "@/components/DashboardLayout";
 import { fuelDataService } from "@/services/fuelDataService";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import type { FuelRequest } from "@shared/types";
 
 export default function MyRequests() {
+  const [, setLocation] = useLocation();
   const { user } = useAuth();
   const [requests, setRequests] = useState<FuelRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,11 +113,17 @@ export default function MyRequests() {
                   </div>
 
                   <Button
-                    onClick={() => (window.location.href = "/tracking")}
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        window.localStorage.setItem("fuelnow_active_request_id", req.id);
+                      }
+                      setLocation("/tracking");
+                    }}
                     size="sm"
-                    className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200"
+                    className="text-xs bg-amber-600 hover:bg-amber-500 text-white font-semibold flex items-center gap-1"
                   >
-                    View Status
+                    <span>Track on Map</span>
+                    <ExternalLink size={12} />
                   </Button>
                 </div>
               </div>

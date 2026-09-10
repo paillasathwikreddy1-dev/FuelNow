@@ -147,16 +147,28 @@ let localRequests: FuelRequest[] = loadStorage("requests", [
     latitude: 28.6139,
     longitude: 77.209,
     address: "Vasant Vihar Marg, Ring Road Mile 4",
-    status: "delivered",
+    status: "on_the_way",
     assigned_station_id: "11111111-1111-1111-1111-111111111111",
     assigned_rider_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
     estimated_distance: 2.8,
-    estimated_time: 14,
-    created_at: new Date(Date.now() - 3600000 * 3).toISOString(),
-    updated_at: new Date(Date.now() - 3600000 * 2.5).toISOString(),
+    estimated_time: 11,
+    created_at: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
+    updated_at: new Date(Date.now() - 1000 * 60 * 2).toISOString(),
+    station: SEED_STATIONS[0],
+    rider: SEED_RIDERS[0],
   },
 ]);
-let localTracking: DeliveryTracking[] = loadStorage("tracking", []);
+let localTracking: DeliveryTracking[] = loadStorage("tracking", [
+  {
+    id: "track-init-1",
+    request_id: "req-init-1",
+    rider_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    latitude: 28.625,
+    longitude: 77.215,
+    status: "on_the_way",
+    recorded_at: new Date(Date.now() - 1000 * 60 * 2).toISOString(),
+  },
+]);
 let localNotifications: AppNotification[] = loadStorage("notifications", []);
 
 // =============================================================
@@ -436,14 +448,48 @@ export const fuelDataService = {
    */
   async getCustomerRequests(userId: string): Promise<FuelRequest[]> {
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase
-        .from("fuel_requests")
-        .select("*, station:fuel_stations(*), rider:riders(*)")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
-      if (!error && data) return data as FuelRequest[];
+      try {
+        const { data, error } = await supabase
+          .from("fuel_requests")
+          .select("*, station:fuel_stations(*), rider:riders(*)")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false });
+        if (!error && data && data.length > 0) return data as FuelRequest[];
+      } catch {
+        // Fall through to local cache
+      }
     }
-    return localRequests.filter((r) => r.user_id === userId);
+
+    localRequests = loadStorage("requests", localRequests);
+    const userMatches = localRequests.filter(
+      (r) => r.user_id === userId || r.user_id === "demo-user-1" || r.user_id === "demo-driver-1"
+    );
+    if (userMatches.length > 0) return userMatches;
+    return localRequests;
+  },
+
+  /**
+   * Get the primary active or latest request to track on map
+   */
+  async getActiveRequest(userId?: string): Promise<FuelRequest | null> {
+    const all = userId ? await this.getCustomerRequests(userId) : await this.getAllRequests();
+    
+    // Check if an explicit active request id was stored
+    if (typeof window !== "undefined") {
+      const savedId = window.localStorage.getItem("fuelnow_active_request_id");
+      if (savedId) {
+        const matched = all.find((r) => r.id === savedId);
+        if (matched) return matched;
+      }
+    }
+
+    // Find in-progress request
+    const inProgress = all.find((r) =>
+      ["pending", "searching", "assigned", "accepted", "on_the_way", "arrived"].includes(r.status)
+    );
+    if (inProgress) return inProgress;
+
+    return all[0] || null;
   },
 
   /**
